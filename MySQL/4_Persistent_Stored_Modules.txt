@@ -1,0 +1,144 @@
+Persistent Stored Modules:
+Definition: collection of function/procedure definitions, temporary relation declarations and others.
+Components: function, procedure
+	Procedure declaration:
+		CREATE PROCEDURE name (parameters)
+        		        local declarations;
+        		        procedure body;
+	e.g:
+	CREATE PROCEDURE rename(
+	     IN oldName VARCHAR(50),
+	     IN newName VARCHAR(50)
+	)
+	UPDATE S
+	SET dept = newName
+	WHERE dept = oldName;
+	
+	Function declaration
+		CREATE FUNCTION name (parameters)
+		RETURNS type
+		        local declarations;
+		        function body;
+
+	@ Body is expected to be a single statement    --> How to solve:  Compound Statement(treated as a single statement)
+	BEGIN [[NOT] ATOMIC]
+	  local declarations
+	  statement list 
+	END;
+	@ Procedure parameters are triples:   mode   para_name    type       --> mode： IN (default), OUT, INOUT
+	@ Function parameters only be mode IN.    --> reason: PSM forbids side-effects in functions.Functions output information through return-values.
+	@ Return does NOT terminate the function! Control continues with the following statement. Thus, it's possible that the return-value will be changed before the function completes.
+	@ Queries that return a single value can be used as the right sides of assignment statements.   
+	How to solve multi-value return--> Cursors
+
+####################################################
+####################################################
+PSM Statements:
+
+Call Statement:
+	Syntax: CALL proc-name (argument-list);
+	CALL can be made from:
+	1. Host-language program  -->    EXEC SQL CALL Foo(:x,3);
+	2. Another PSM procedure/function -->  CALL Foo(x,3)
+	3. The generic SQL interface -->     CALL Foo(1,3)
+
+Branching Statement:
+	Syntax	(Much like Matlab)
+	IF condition THEN
+	    statement list
+	ELSEIF condition THEN
+	    statement list
+	ELSEIF ...
+	(ELSE
+		statement list)      --> optional 
+	END IF;
+@ statement list: not need a surrounding BEGIN...END
+
+Loop statement: 
+	Normal loop Syntax:
+	    myloop: LOOP
+	          ... 
+	          LEAVE myloop
+	          ...
+	    END LOOP;
+
+	For loop Syntax
+	    FOR loopvar AS csrname CURSOR FOR query
+	    DO
+	      statement list
+	    END FOR;
+
+	WHILE-Loops Syntax:
+	    WHILE condition DO
+	    	statement list
+  	    END WHILE;
+
+	REPEAT-Loops Syntax:   
+	    REPEAT
+	        statement list
+	    UNTIL condition
+	    END REPEAT;
+
+@ Used only to iterate over a cursor.
+@ Attributes in SELECT of query are treated as local variables.
+
+Exception Statement:
+	Syntax
+		DECLARE CONTINUE || EXIT || UNDO  HANDLER
+		FOR condition-name			--> list of declared condtions or expressions of the form SQLSTATE 'xxxxx'
+      			statement
+	e.g:
+	DECLARE Not_Found CONDITION FOR SQLSTATE ‘02000’;
+	DECLARE Too_Many CONDITION FOR SQLSTATE ‘21000’;
+
+	BEGIN
+	        DECLARE EXIT HANDLER FOR Not_Found, Too_Many
+	                RETURN NULL;
+	        RETURN (SELECT sno FROM S WHERE name = n);
+	END;
+
+
+##########################################
+Example for all the possible statements above:
+
+CREATE PROCEDURE MeanVariance
+     (IN course CHAR(5), OUT mean REAL, OUT variance REAL)
+
+DECLARE Not_Found CONDITION FOR SQLSTATE '02000';		
+#SQL state:  '00000': 没有任何错 '02000': 没有找到SQL查询部分的任何元组
+
+DECLARE csr CURSOR FOR
+      SELECT grade FROM SC WHERE cno = course;
+DECLARE temp INTEGER;
+DECLARE count INTEGER;
+
+BEGIN
+      SET mean = 0.0;
+      SET variance = 0.0;
+      SET count = 0;
+      OPEN csr;
+      theLoop: LOOP
+             FETCH csr INTO temp;
+             IF Not_Found THEN 
+		LEAVE theLoop 
+	END IF;
+             SET mean = mean + temp;
+             SET variance = variance + temp * temp;
+             SET count = count + 1;
+       END LOOP;
+       SET mean = mean/count;
+       SET variance = variance/count - mean * mean;
+       CLOSE csr;
+END;
+	
+
+
+
+
+
+
+
+
+
+
+

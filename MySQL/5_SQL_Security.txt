@@ -1,0 +1,81 @@
+SQL Security and User authorization: 
+
+Why: 
+	1. Users only see the data they’re supposed to;
+	2. Guard against malicious users
+
+How to control:
+	1. Authorization ID  (User ID(用于个人), Role(用于集体))
+	E.g : Authorization in A Session
+	SESSION_USER   -->  SQL session user ID
+		CONNECT TO … USER usr;
+	CURRENT_USER	-->  the current user ID
+		SET SESSION AUTHORIZATION…
+	CURRENT_ROLE	-->the current rolename
+		SET ROLE… 
+
+	2. Privileges(associated with authorization ID)
+	##################################
+	Types:
+	1.  SELECT, INSERT, DELETE, UPDATE-->
+	applied to a relation (base table or view) 
+	2.   REFERENCES --> the right to refer to relations in IC 
+	3.   USAGE  --> the right to use some kinds of schema elements (other than relations and assertions) in ones's own declarations.
+	4.   TRIGGER  -->  the right to define triggers on a relation
+	5.   EXECUTE  --> the right to execute codes such as PSM proc/func
+	6.   UNDER  -->  the right to create subtypes of a UDT
+	##################################
+	Obtain Privileges:	through Owner , granted user
+	Owner:
+	For schema: 
+		CREATE SCHEMA … AUTHORIZATION usr
+	For session: 
+		CONNECT TO svr AS conn 
+		AUTHORIZATION usr;
+	For module:
+	MODULE modname … AUTHORIZATION usr
+	@ Owner may GRANT the privileges to others
+	@ Owner of something has all privileges associated with that thing
+	###################################
+	Granting Privileges :
+	Syntax:
+	GRANT privileges ON DB-element TO users [WITH GRANT OPTION]
+
+	@ privileges: SELECT, INSERT, UPDATE(A), …
+	     DB-element: usually a relation (base table or view).
+	@ Each privilege has an associated grant option, and the privilege may be granted to users with or without grant option.
+	@Grant Diagram  --> To keep track of both privileges and their origins.
+	Diagram components:
+	Node: user/privilege(* = WITH GRANT OPTION
+** = derived from ownership (auto. WITH GRANT OPTION))
+	Arc: grant. 	(e.g. U1/Q grants P to U2) 
+	Diagram rules:
+	1. Privilege p and p with grant option belonging to user U are different privileges and must be represented by different nodes.
+	2. Privilege p and a more general privilege q belonging to user U are different privileges and must be represented by different nodes.
+	3. If the more powerful privilege (with grant option or more general) is lost, the less powerful one might still be retained.
+	@ Revoke
+	Revoke Privileges	--> Syntax:
+	REVOKE privileges ON DB-element  FROM users [CASCADE | RESTRICT]
+	$CASCADE: also revoke any privileges that were granted only because of the revoked privileges.
+	$Delete the arc in the grant diagram. Any node that is not accessible from some ownership node is also deleted.
+	$RESTRICT: Revoke statement cannot be executed if it would result in cascading revoking of other privilege.
+	@A granted privilege may be revoked at any time.
+
+	Revoke Grant option:
+	Syntax
+	REVOKE GRANT OPTION FOR privilege ON relation FROM users [CASCADE | RESTRICT]
+	@Only revoke the grant option, not the privilege itself.	(差别只在 FOR privilege ON...)
+
+
+
+
+
+
+
+
+
+
+
+
+
+

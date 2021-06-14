@@ -1,0 +1,321 @@
+#############################################
+#############################################
+Transaction:
+
+Reason: 
+	1. Databases are normally being accessed concurrently. If not controlled, the interacting events may result in 
+	(a). lost updates        --> 一个事务更新的数据还未commit就被另一个事务更新了
+	(b). dirty reads           --> 一个事务读取的数据是另一个事务修改过了但还未commit的数据
+	Risk: T1 may rollback after T2 has committed. 
+	(c). unrepeatable reads	--> 一个事务（T1）读到的数据马上被另一个事务（T2）修改，导致这个数据无法再次被T1获取
+	2. Hardware or software failures/crash
+
+Function: Concurrency control and recovery control, to maintain DataBase in consistent state(原子性和独立性0), not in undesired state.
+
+Definition: One or more operations on the database that forms a logical unit of work, and thus must be executed atomically
+
+Features: ACID
+	Atomic : Whole transaction or none is done.
+	Consistent : Database constraints preserved.
+	Isolated : It appears to the user as if only one process executes at a time.
+	Durable : Effects of a process survive a crash.
+
+Forms: Implicit and Explicit
+	Implicit start: SELECT, DELETE, UPDATE
+	Explicit start: START TRANSACTION mode [{,mode}…]
+
+Transaction modes:   (DBMS may take advantage of this knowledge)
+	method: SET TRANSACTION mode [{,mode}…]
+	A mode consists of two part:   access mode , isolation mode
+	Access level -->
+		READ ONLY			concurrency OK
+		READ WRITE  			default
+	##################
+	Isolation level -->
+		READ UNCOMMITTED
+		READ COMMITTED
+		REPEATABLE READ
+		SERIALIZABLE			not always satisfied; SQL default
+	@ the isolation level of a transaction T affects only what data T may see; it does not affect what any other transactions sees.
+	@ Phantom （幻像元组）: 
+		1. 在事务执行过程中，当两个完全相同的查询语句执行得到不同的结果集。这种现象称为“幻像读（phantom read）”
+		2. 当事务没有获取范围锁（英语：range locks）的情况下执行SELECT ... WHERE操作可能会发生“幻像读”。
+		3.“幻像读”是不可重复读的一种特殊场景
+
+	method: 
+	1. RU --> allow read uncommited data (Must be very careful!)
+	SET TRANSACTION ...
+		ISOLATION LEVEL READ UNCOMMITTED;
+	E.g:  SET TRANSACTION READ WRITE
+	    	ISOLATION LEVEL READ UNCOMMITTED;
+	@ Dirty read, Non-repeatable, has Phantom, default access mode: Random
+	2. RC --> only allow read commited data
+	SET TRANSACTION ...
+		ISOLATION LEVEL READ COMMITTED;
+	@No“dirty read”, but Non-repeatable , has phantom, default access mode: R/W
+	3. RR
+	SET TRANSACTION ...
+		ISOLATION LEVEL REPEATABLE READ;
+	@No dirty read; repeatable, but has Phantom, default access mode: R/W 	（可重复读只保证第一次查询检索到一个元组那么可以保证重复查询会检索到同一元组，而并不能保证两次查询结果一致(即中间没有新元组插入)）
+	4. S
+	No dirty read; repeatable; no phantom, default access mode: R/W
+ 
+
+End type (结束方式):
+	Explicit COMMIT
+	Explicit ROLLBACK  --> initiative abort a transaction
+	Implicit ROLLBACK   --> System-generated, after a crash
+@ SQL allows dirty reads for a transaction
+
+
+
+#############################################
+#############################################
+Constrains -->  Specify in IC(Integrity Constrains):
+
+Function: Restrictions on allowable data in DB.
+Definition:  It's part of the schema definition(In addition to structure and type restrictions)
+
+How does it works --> 
+DBMS checks all DB modifications to see whether an IC is violated. 
+If yes, reject the operation or  do some compensating operations
+·············
+
+Types:
+
+################################
+1. Table constraint
+
+	*******************************************
+	(a) Unique constraint    --> Key constrains (Primary key || unique)
+	@ An index on key attributes is vital for efficient checking. Otherwise, a table scan is needed.
+
+	*******************************************
+	(b) Referential Integrity constraint	--> Foreign keys (references the key (PK or UNIQUE) K of another relation. Any value appearing in FK of R must also appear in the referenced K of S.
+)
+	Why: Data must make sense across DB, not just in a table.
+
+E.g:
+CREATE TABLE SC (
+  sno char(10) REFERENCES Student(sno),
+  cno char(20) REFERENCES Course(cno),
+  grade integer
+);
+
+@ kinds of modifications may violate RI constraint:
+	1. insert into R(FK) with nonexistent FK values
+	2. update R(FK) with nonexistent FK values
+	3. delete from S(K) referenced K values
+	4. update S(K) on referenced K values
+
+@Types of policy to handle modifications that violate RI constraint:
+	1. Default policy: handling 1,2,3,4
+		reject violating modifications		（对于1，2类型的修改，只能采取拒绝原则）
+	2. Cascade policy: handling 3,4	（级联原则）--> 适合于修改
+		delete/update K --> delete/update FK
+	3. Set-Null policy: handling 3,4	（置空原则）
+		delete/update K --> set NULL to FK
+	4. Set-Default policy: handling 3,4	（缺省原则）
+		delete/update K --> set default to FK
+E.g:
+CREATE TABLE SC (
+  sno char(10) REFERENCES Student(sno)
+               ON DELETE SET NULL
+               ON UPDATE CASCADE,
+);
+
+	*******************************************
+	(c) Attribute Constraints		--> NOT NULL, CHECK (condition)
+	Check constraint	(基于属性的约束)
+		CHECK (condition)  -->
+		Satisfied iff condition is not false for any row of a table.
+		 
+		@ Condition can refer to other attributes/relations, but only in the FROM of a subquery （若condition要引用其它的属性或者关系（非被检查属性），该关系必须是被检查属性的关系或这些关系中的属性（即from种的关系或属性））
+		@ 检查执行只有当操作修改了与Check constraint 相关的属性时候才进行
+		E.g:
+		CREATE TABLE S (
+		      sno char(10) PRIMARY KEY,
+		      name char(20) NOT NULL,
+		      age integer CHECK (age<100),
+		      gender char(1) CHECK (gender IN ('F','M'))			# 此处限定了gender 的二元取值
+		      dept varchar(30) NOT NULL
+		 );
+	Check constraint (基于元组的约束)：
+	E.G：
+	CREATE TABLE MovieStar(
+		name CHAR(30) PRIMARY KEY,
+		gender CHAR(1)  CHECK (gender IN ('F','M')),		# attribute check
+		CHECK (gender ='F' OR name NOT LIKE 'Ms.%')		# tuple check
+	)
+
+	@ Defer the check:
+	Why: Solve circular constraints problem --> A is a FK referencing B, and B is a FK referencing 
+	A Constraint Type: DEFERRABLE , NOT DEFERRABLE 
+		NOT DEFERRABLE ：
+			checked immediately
+		DEFERRABLE: 
+			immediate（default） or deferred checking
+		E.g: SET CONSTRAINT constraint_name (INITIALLY) DEFERRED | IMMEDIATE; 
+	Defer Type:
+		Deferred: checked at the end of the current transaction, just before commit.
+		Initial:  at the start of SQL-transaction  -->INITIALLY DEFERRED 
+
+@Altering Constraints on Tables：
+	1. 
+	star_name CHAR(30) CONSTRAINT NameIsKey PRIMARY KEY    
+	CONSTRAINT RightTitle  CHECK (gender ='F' OR name NOT LIKE 'Ms.%')
+	@ 最好为你的约束命名，一旦约束被创建，名字将不能被修改
+	2. ALTER TABLE tablename 
+	    DROP CONSTRAINT cname 
+	3.ALTER TABLE tablename 
+	    ADD CONSTRAINT cname cons-def
+	前提条件：
+	1. Can only add tuple-based constraints（添加约束只能与元组相关，而不能是与属性相关）: tuple-based CHECK, PK, FK
+	2. Must hold for the current relation instance
+
+
+####################################
+2. Domain constraint
+
+####################################
+3. Assertions
+What: Constraints on entire relation or entire DB
+
+Syntax:
+	CREATE ASSERTION assertion_name CHECK (condition);
+	DROP ASSERTION assertion_name
+@ 对比CHECK：  assertion中引用任何的属性都必须要introduce, 不能像CHECK中直接使用。 断言中也不能确保和子查询之间的约束一定成立
+@ Condition must be true(必须为Bool值且要为真) when the assertion is created and must remain true.
+@ Checked only whenever a mentioned relation changes.
+
+#############################################
+#############################################
+Trigger:
+
+What: ECA rules (event-condition-action rules)
+	Event = changes in DB, e.g., “insertion into S”
+	Condition = a test for whether or not the trigger applies
+	Action = one or more SQL statements
+
+Referencing Clause：       -->   refer to tuples / tables been changed
+(a)  OLD /  NEW 
+	DELETE: OLD = deleted tuples
+	INSERT: NEW = inserted tuples
+	UPDATE: OLD = before update
+	UPDATE: NEW = after update 
+(b) OLD TABLE / NEW TABLE
+
+##############################################
+Syntax:
+CREATE TRIGGER name
+     	BEFORE/AFTER  UPDATE/INSER/DELETE [OF A1,A2,...] ON R
+	REFERENCING {OLD ROW | OLD TABLE} AS oldvar ,{NEW ROW | NEW TABLE} AS newvar
+FOR EACH {ROW | STATEMENT}       --> row-level trigger(execute once for each modified tuple;)   	--> statement-level trigger(execute once for the statement)
+WHEN(condition)
+BEGIN
+ ... 
+END
+(actions)
+
+记忆技巧： create trigger tri after update of attribute on relation referencing new attributeA as A  for  each row when condition do_action
+
+E.g:
+CREATE TRIGGER beststudent
+AFTER INSERT ON SC
+REFERENCING NEW ROW AS newSC   ||    REFERENCING OLD ROW AS oldS
+FOR EACH ROW
+WHEN (newSC.grade = 100)
+   SELECT name, dept
+   FROM S
+   WHERE S.sno = newSC.sno;
+
+Comparison:
+                    triggering event           	cond     		 actions      	who specify 
+Constraint       violation     		check     		  reject        	   system 
+Trigger           explicitly specified   	action cond      explicitly specified  	programmer
+                            .    
+
+@ Constrains is a special kind of trigger:
+
+#############################################
+#############################################
+View: 
+
+Vision of DB:
+	views   --> used by user
+	relations   --> used by DBA
+	stored infomation	  --> used by DBA
+
+What --> Definition : View is an expression(a named query) that defines a viewed table(result of such a query) without physically creating it.         
+View 相当于宏定义， 调用view即返回一个特定的query的result table。 普通的query 返回的table 叫做 derived table
+ 
+Why: To make certain queries easier or more natural to express
+Syntax:
+	CREATE VIEW viewname(A1,...,An) AS (query declaration);
+	E.g:
+	CREATE VIEW CS_S AS
+     	  SELECT sno,name,age 
+     	  FROM Student
+     	  WHERE dept = ‘CS’;
+	@ Only definition of views are stored.
+How to use:    --> just take a view as a sub-query
+	SELECT name FROM CS_S
+	WHERE sno = ‘518’;
+
+@ updatable view  --> insert tuple through view rather than base table will cause anomaly
+	INSERT INTO CS_S
+	    VALUES (‘007’,’james’,18);
+	It causes (‘007’,’james’,18 , NULL) to be inserted into Student, which can't be restored into CS_S. That is to say , in view CS_S we can't see the new updated data.
+@ drop view -->   DROP VIEW viewname
+@ Instead-Of Triggers on Views  --> 
+	Actions of trigger is done instead of the modification on a view   将修改view 作为trigger 的events 触发trigger执行action来进行真正的修改。
+	Syntax:
+	CREATE TRIGGER insertCSS
+	INSTEAD OF INSERT ON CS_S
+	REFERENCING NEW ROW AS nr
+	FOR EACH ROW
+		INSERT INTO Student
+		VALUES(nr.sno,nr.name,nr.age,’CS’);
+@ Materialized Views   --> If a view is used frequently enough, it may be efficient to materialize it.
+	Syntax:
+	CREATE MATERIALIZED VIEW CS_S
+	AS SELECT sno,name,age FROM S WHERE dept=‘CS’;
+	Risk:
+		Each time a base table changes, the materialized view may change. But we cannot afford to recompute the view with each change.
+		How to solve: Periodic Maintainence  of MV (Materialized Views)
+
+#############################################
+#############################################
+Indexes:
+
+What: It'a a Data Structure--> index table with key and values. 
+	Index key can be any attribute or set of attributesl;
+	index values store the key's position on the base table
+Implementation of index:   B-tree or B+-tree
+
+Function: Make queries faster, but modifications slower.
+
+Sytax:
+	CREATE INDEX scInd ON SC(sno,cno);
+How to use:
+Index on attributes which is :  key|| almost a key || attributes whose tuples are clustered   	-->  被用作索引的属性需要无二义性，因此最好为key
+Best Index:
+	According to information ( get info from history or app code) about queries and modifications
+	E.g:
+	Index -->    SC(sno,cno)
+	Information:
+		Q1: SELECT cno FROM SC WHERE sno=‘xxx’;
+		Q2: SELECT sno FROM SC WHERE cno=‘yyy’;
+ 		 I: INSERT INTO SC VALUES(‘xxx’,’yyy’);
+		Prob(Q1) = p1, Prob(Q2) = p2 , Prob(I ) = p3 =1-p1-p2 
+	SC occupies n blocks. On the average, ‘xxx’ takes c courses and ‘yyy’ is taken by s students.
+	Calculation: Calculate the E(operation) of 
+	1. No index (n*p1+n*p2+2*p3)  
+	2. sno index ((1+c)*p1+n*p2+4*p3)
+	3. cno index (n*p1+(1+s)*p2+4*p3)   
+	4. both index ((1+c)*p1+(1+s)*p2+6*p3)
+	to find the best index.
+
+@ Automatic Selection of Indexes --> Use tuning advisor: 
+The index set resulting the lowest cost is suggested, or automatically created
+

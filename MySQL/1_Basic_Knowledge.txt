@@ -1,0 +1,122 @@
+Key Words:
+
+#####################
+#####################
+Common:
+
+IN
+NOT
+
+DATE, TIME, TIMESTAMP     -->DATE ’1931-09-18’|| TIME ’22:20:01.23’|| TIMESTAMP ‘1931-09-18 22:20:01’|| TIME WITH TIME ZONE '12:00:00+8:00'
+
+UNION,INTERSECT,EXCEPT       -->差:  (SELECT  sno FROM SC WHERE grade=100)  EXCEPT  (SELECT sno FROM S WHERE age>=18)
+
+JOIN... ON theta, CROSS JOIN,NATURAL JOIN      --> These JOIN expressions can be stand-alone queries or used in place of relations in a FROM clause.
+OUTER JOIN		--> Optional LEFT, RIGHT, or FULL(default.) before OUTER.
+
+DISTINCT,ALL 		--> R UNION ALL S; SELECT DISTINCT sno FROM SC;
+-》Bag Union, Intersection, Difference(本来就是集合运算， SQL在默认情况下采用Bag语义，在集合运算下采用set语义， 若要让他采用BAG语义，则要强制说明)
+
+SUM( ), AVG( ), MIN( ), MAX( ), COUNT(A),COUNT(*)		--> SELECT sno,AVG(grade) FROM SC GROUP BY sno;
+-》
+1. If any aggregation is used, then each element of SELECT clause must either be aggregated or appear in GROUP BY clause.
+2. NULL is ignored in any aggregation, but NULL is treated as an ordinary value when forming groups
+3. The result of the aggregation in  empty bag is NULL or 0 for COUNT
+
+@ EXIST , IN, ALL, ANY 都作用在WHERE中子查询形成的关系上
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+Modification:    INSERT INTO ... + Contents    &&  CREATE  TABLE ...+ (attributes) &&  DELETE FROM ... + Contents    && UPDATE .... SET + Contents
+
+INSERT ...  INTO ...
+		-->   
+1.
+INSERT INTO Student(name,sno,dept)
+VALUES ('Chow','008','CS');
+2.
+INSERT INTO CSNameList
+    SELECT name 
+    FROM Student 
+    WHERE dept='CS';
+##########################
+CREATE  TABLE... Name (attributes)	-->
+CREATE TABLE CSNameList (
+      name char(10));
+##########################
+DELETE FROM...		-->
+
+1.
+DELETE FROM Student WHERE age>30;
+2.
+DELETE FROM Student S
+  WHERE EXISTS
+      (SELECT * FROM SC 
+       WHERE SC.sno = S.sno AND
+             grade = 0);
+##########################
+UPDATE... SET...		-->
+
+UPDATE S
+  SET dept='CS', age=age+1
+  WHERE sno='007';
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+Query:
+
+SELECT ...
+FROM ...
+WHERE ...
+GROUP BY ...
+HAVING ...
+ORDER BY ...		-->
+1.
+SELECT name,'''s avg=',AVG(grade)
+FROM S as Student,SC as SCount,(SELECT-FROM-WHERE) tuplevar                #  Cartesian product  ; AS is optional in FROM
+WHERE S.sno = SC.sno AND grade>=60
+GROUP BY S.sno,name
+HAVING SUM(grade)>=600
+ORDER BY 3 DESC, name,2020-age;                # Default: ASC   3: Use column order numbers in ORDER BY
+#####################
+Nested Loops:
+
+SELECT A1,…,An
+FROM R1,…,Rm
+WHERE C;		--> 
+for each tuple t1R1 do 
+    … 
+    for each tuple tm Rm do               # Parallel assignment : Assign tuples to tuple variables in arbitrary order (in parallel); 
+         if C is true for t1 … tm
+         then evaluate A1,…,An according to t1 … tm
+                         to produce a tuple in the result
+
+@@@Be careful! An Unintuitive Consequence		-->
+When Rm is empty, this query will produce an empty result    Reason: Nested Loop: tuple variable Rm iterates 0 times, thus for Parallel Assignment: Rm can't be assigned
+#####################
+Pattern match:   % matches any string ;  _ matches any one character
+
+LIKE
+NOT LIKE			-->
+s LIKE ‘#%%#%’ ESCAPE ‘#’  E.g: %12341324adsf%          
+#####################
+Subquery:
+
+Scoping rule: an attribute refers to the most closely nested relation with that attribute.
+
+Parentheses around subquery are essential.
+
+Return value:
+atomic value 	single tuple	relation		empty
+A          		A  B          	A  B          	8 > ALL(空集)   Correct
+1          		1   2         	1   2		8 > ANY(空集)   Wrong
+                             			3   4
+
+
+

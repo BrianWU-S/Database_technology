@@ -1,0 +1,142 @@
+Definition:
+The context in which SQL-data exists and SQL-statements are executed
+Architecture type:
+	C/S (Clients and Servers)
+	Three-Tier (Servers has three layer):
+		Web servers --- talk to the user
+		Application servers --- execute the business logic
+		Database servers --- get what the app servers need from the database
+DB elements/descriptors defined in an SQL environment: 
+	tables, views, triggers
+
+Organization of DB Elements:
+	##########################################
+	Schemas (Basic unit, 在最底层，相当于文件)   -->
+		Schema = {base tables, views, domains, UDTs, constraints, triggers, char sets, colations, …}
+		@Close to but less than what we call a “database” 
+	Syntax:
+	Create-->
+		CREATE SCHEMA schema_name
+        		CREATE TABLE ...
+        		CREATE VIEW ...
+        		CREATE ASSERTION ...
+	Current-->
+		SET SCHEMA schema_name;
+	##########################################
+	Catalogs（Basic unit for supporting unique, accessible terminology,1+ schemas组成，相当于文件夹）-->
+	Syntax:
+	Create-->	
+		Catalog = {INFORMATION_SCHEMA, Schema1, Schema2, ...}
+	Current-->
+		SET CATALOG catalog_name;
+	@ add new elements in Catalog or schema, you need to change to current .
+	@ access elements:  SQL Server: server1.db2.owner3.obj4
+	##########################################	
+	Clusters（1+catalogs组成，相当于主文件夹）
+	Syntax:
+	Cluster = {catalogs}
+	@ Each user has an associated cluster of all catalogs accessible to the user. 
+	(一个Cluster相当于一个分配给用户的主文件夹，与该用户有关的所有的数据库的信息（储存、执行）都包含于其中)
+	@A cluster is the maximum scope of DB operations
+
+#############################################
+#############################################
+SQL:
+SQL schema, catalog, cluster:
+	Information Schema:
+	1. Every catalog contains an INFORMATION_SCHEMA that includes the descriptors of a number of schema objects
+	2. Mostly are view definitions --> define every descriptor in that catalog to be accessed
+	Each view in  Information Schema is so specified that a given user can access only those rows of the view that represent descriptors on which that user has privileges.
+
+	3. Not changed, as though it was SQL-data.
+
+
+	@The mechanisms for creating and destroying catalogs|| schemas are implementation-defined (need execution of SQL-catalog|| SQL-schema statements )
+
+SQL data:
+	SQL-data is data described by SQL-schemas
+	SQL-data consists entirely of table variables, called base tables.
+
+SQL connections between C/S:
+	Syntax:
+	CONNECT TO server_name(may be DEFAULT) AS conn_name
+	     AUTHORIZATION user and password
+	@ Default connection: simply executing SQL statements at a host with a SQL client.
+	States:  active, dormant, terminated
+	active vs. dormant : many opened, one active    --> SET CONNECTION conn_name
+	terminated:    --> DISCONNECT conn_name
+
+SQL sessions:
+	Definition: SQL operations,  performed while a connection is active
+	Components  -->   Each session has
+		1. a current catalog,
+		2. a current schema within that catalog
+		3. an authorized user
+
+SQL modules:
+	Definition:
+		 SQL term for an application program.   (SQL agent: an execution of a module)
+		module vs. SQL agent like program vs. process
+	Types of modules:
+		Generic SQL interface: each query or other statement is a module by itself.
+		Embedded SQL: the compiled host-language program is a module.
+		True modules: a collection of stored procedures/functions.
+
+SQL clients and servers:
+	An SQL-client, SQL-server is a processor, perceived by the SQL-agent as part of the SQL-implementation. 		Client establishes SQL-connections between itself and SQL-servers, while Server  manages SQL-data.
+	@ An SQL-agent is bound to an SQL-client
+
+#####################################################
+#####################################################
+SQL with host language:
+
+@SELECT … FROM cannot be used directly.  --> It producees a set of tuples, cause impedance mismatch: HL doesn’t support set type directly.      How to solve--> cursor
+	Without cursor selct --> Single-row SELECT
+	EXEC SQL SELECT *
+	         INTO :sno,:name,:age,:dept
+	         FROM S
+	         WHERE sno = ‘007’;
+
+
+SQL cursor:  a handle associated with a relation 
+	Simple syntax:
+		EXE SQL DECLARE my_cursor CURSOR FOR ...(Query)
+	Full syntax:
+		DECLARE cursor_name
+		[SENSITIVE | INSENSITIVE | ASENSITIVE]		--> default:  ASENSITIVE   : Protecting against concurrent updates
+		[SCROLL | NO SCROLL]  		--> default:  NO SCROLL
+		CURSOR
+		[WITH HOLD | WITHOUT HOLD]		--> default:  WITHOUT HOLD  : whether auto close after transaction commit
+		[WITH RETURN | WITHOUT RETURN] FOR query		--> default:  WITHOUT RETURN
+		[ORDER BY …]
+		[FOR {READ ONLY | UPDATE [OF column]}]
+	@Read only cursors can run simultaneously with an insensitive cursor for the same relation	
+	@query is executed when cursor is OPENed, not when it is DECLAREed
+
+	@Modifying DB by Cursor-->  DELETE FROM …WHERE CURRENT OF cursor_name || UPDATE … SET …WHERE CURRENT OF cursor_name
+	e.g Delete the 3rd tuple of Student.
+	EXEC SQL DECLARE cursorS CURSOR FOR Student;	
+	EXEC SQL OPEN cursorS;	
+	EXEC SQL FETCH FROM cursorS INTO :v1,:v2,:v3,:v4;
+	EXEC SQL FETCH FROM cursorS INTO :v1,:v2,:v3,:v4;
+	EXEC SQL DELETE FROM S
+                    WHERE CURRENT OF cursorS;
+	EXEC SQL CLOSE cursorS;
+
+SQL shared variables:		(共享变量可以在SQL语句中任何允许 常量  出现的地方)
+EXEC SQL BEGIN DECLARE SECTION;
+      char snoInput[8], nameInput[10];
+      char SQLSTATE[6];
+   EXEC SQL END DECLARE SECTION;
+	
+
+
+
+
+
+
+
+
+
+
+
